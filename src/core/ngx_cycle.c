@@ -479,16 +479,6 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
 #endif
     }
 
-#if (NGX_SYSLOG)
-
-    if (cycle->log->syslog != NULL
-        && cycle->log->syslog->fd != NGX_INVALID_FILE)
-    {
-        ngx_close_socket(cycle->log->syslog->fd);
-    }
-
-#endif
-
     cycle->log = &cycle->new_log;
     pool->log = &cycle->new_log;
 
