@@ -174,7 +174,7 @@ ngx_shmtx_wakeup(ngx_shmtx_t *mtx)
 
         wait = *mtx->wait;
 
-        if (wait == 0) {
+        if ((ngx_atomic_int_t) wait <= 0) {
             return;
         }
 
@@ -258,7 +258,7 @@ ngx_shmtx_trylock(ngx_shmtx_t *mtx)
 
 #if __osf__ /* Tru64 UNIX */
 
-    if (err == NGX_EACCESS) {
+    if (err == NGX_EACCES) {
         return 0;
     }
 
