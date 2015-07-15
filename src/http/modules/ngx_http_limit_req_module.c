@@ -1,3 +1,4 @@
+
 /*
  * Copyright (C) Igor Sysoev
  * Copyright (C) Nginx, Inc.
@@ -17,6 +18,7 @@ typedef struct {
     ngx_msec_t                   last;
     /* integer value, 1 corresponds to 0.001 r/s */
     ngx_uint_t                   excess;
+    ngx_uint_t                   count;
     u_char                       data[1];
 } ngx_http_limit_req_node_t;
 
@@ -39,6 +41,8 @@ typedef struct {
     ngx_slab_pool_t             *shpool;
     /* integer value, 1 corresponds to 0.001 r/s */
     ngx_uint_t                   rate;
+    ngx_http_complex_value_t     key;
+    ngx_http_limit_req_node_t   *node;
     ngx_array_t                 *limit_vars;
 } ngx_http_limit_req_ctx_t;
 
@@ -46,11 +50,11 @@ typedef struct {
 typedef struct {
     ngx_shm_zone_t              *shm_zone;
 
-    ngx_uint_t                   nodelay; /* unsigned  nodelay:1 */
     /* integer value, 1 corresponds to 0.001 r/s */
     ngx_uint_t                   burst;
+    ngx_uint_t                   nodelay; /* unsigned  nodelay:1 */
     ngx_str_t                    forbid_action;
-} ngx_http_limit_req_t;
+} ngx_http_limit_req_limit_t;
 
 
 typedef struct {
@@ -62,6 +66,7 @@ typedef struct {
     ngx_int_t                    geo_var_index;
     ngx_str_t                    geo_var_value;
 
+    ngx_array_t                  limits;
     ngx_uint_t                   limit_log_level;
     ngx_uint_t                   delay_log_level;
     ngx_uint_t                   status_code;
@@ -69,10 +74,12 @@ typedef struct {
 
 
 static void ngx_http_limit_req_delay(ngx_http_request_t *r);
-static ngx_int_t ngx_http_limit_req_lookup(ngx_http_request_t *r,
-    ngx_http_limit_req_t *limit_req, ngx_uint_t hash, ngx_uint_t *ep);
-static void ngx_http_limit_req_expire(ngx_http_request_t *r,
-    ngx_http_limit_req_ctx_t *ctx, ngx_uint_t n);
+static ngx_int_t ngx_http_limit_req_lookup(ngx_http_limit_req_limit_t *limit,
+    ngx_uint_t hash, ngx_str_t *key, ngx_uint_t *ep, ngx_uint_t account);
+static ngx_msec_t ngx_http_limit_req_account(ngx_http_limit_req_limit_t *limits,
+    ngx_uint_t n, ngx_uint_t *ep, ngx_http_limit_req_limit_t **limit);
+static void ngx_http_limit_req_expire(ngx_http_limit_req_ctx_t *ctx,
+    ngx_uint_t n);
 
 static void *ngx_http_limit_req_create_conf(ngx_conf_t *cf);
 static char *ngx_http_limit_req_merge_conf(ngx_conf_t *cf, void *parent,
@@ -152,8 +159,8 @@ static ngx_http_module_t  ngx_http_limit_req_module_ctx = {
     NULL,                                  /* create server configuration */
     NULL,                                  /* merge server configuration */
 
-    ngx_http_limit_req_create_conf,        /* create location configration */
-    ngx_http_limit_req_merge_conf          /* merge location configration */
+    ngx_http_limit_req_create_conf,        /* create location configuration */
+    ngx_http_limit_req_merge_conf          /* merge location configuration */
 };
 
 
