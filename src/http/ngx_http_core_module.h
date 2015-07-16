@@ -13,6 +13,10 @@
 #include <ngx_core.h>
 #include <ngx_http.h>
 
+#if (NGX_THREADS)
+#include <ngx_thread_pool.h>
+#endif
+
 
 #define NGX_HTTP_GZIP_PROXIED_OFF       0x0002
 #define NGX_HTTP_GZIP_PROXIED_EXPIRED   0x0004
@@ -27,7 +31,7 @@
 
 #define NGX_HTTP_AIO_OFF                0
 #define NGX_HTTP_AIO_ON                 1
-#define NGX_HTTP_AIO_SENDFILE           2
+#define NGX_HTTP_AIO_THREADS            2
 
 
 #define NGX_HTTP_SATISFY_ALL            0
@@ -42,11 +46,6 @@
 #define NGX_HTTP_IMS_OFF                0
 #define NGX_HTTP_IMS_EXACT              1
 #define NGX_HTTP_IMS_BEFORE             2
-
-
-#define NGX_HTTP_SERVER_TAG_ON          0
-#define NGX_HTTP_SERVER_TAG_OFF         1
-#define NGX_HTTP_SERVER_TAG_CUSTOMIZED  2
 
 
 #define NGX_HTTP_KEEPALIVE_DISABLE_NONE    0x0002
@@ -82,7 +81,6 @@ typedef struct {
 #endif
 #if (NGX_HTTP_SPDY)
     unsigned                   spdy:1;
-    unsigned                   spdy_detect:1;
 #endif
 #if (NGX_HAVE_INET6 && defined IPV6_V6ONLY)
     unsigned                   ipv6only:1;
@@ -196,7 +194,6 @@ typedef struct {
     ngx_http_conf_ctx_t        *ctx;
 
     ngx_str_t                   server_name;
-    ngx_str_t                   server_admin;
 
     size_t                      connection_pool_size;
     size_t                      request_pool_size;
@@ -250,7 +247,6 @@ struct ngx_http_addr_conf_s {
 #endif
 #if (NGX_HTTP_SPDY)
     unsigned                   spdy:1;
-    unsigned                   spdy_detect:1;
 #endif
     unsigned                   proxy_protocol:1;
 };
@@ -305,11 +301,8 @@ typedef struct {
 
 
 typedef struct {
-    unsigned                   status:16;
-    unsigned                   default_page:1;
-
+    ngx_int_t                  status;
     ngx_int_t                  overwrite;
-
     ngx_http_complex_value_t   value;
     ngx_str_t                  args;
 } ngx_http_err_page_t;
@@ -376,8 +369,6 @@ struct ngx_http_core_loc_conf_s {
     off_t         directio;                /* directio */
     off_t         directio_alignment;      /* directio_alignment */
 
-    ngx_bufs_t    client_body_buffers;
-    size_t        client_body_postpone_size;
     size_t        client_body_buffer_size; /* client_body_buffer_size */
     size_t        send_lowat;              /* send_lowat */
     size_t        postpone_output;         /* postpone_output */
@@ -407,12 +398,9 @@ struct ngx_http_core_loc_conf_s {
 
     ngx_flag_t    client_body_in_single_buffer;
                                            /* client_body_in_singe_buffer */
-    ngx_flag_t    retry_cached_connection;
     ngx_flag_t    internal;                /* internal */
     ngx_flag_t    sendfile;                /* sendfile */
-#if (NGX_HAVE_FILE_AIO)
     ngx_flag_t    aio;                     /* aio */
-#endif
     ngx_flag_t    tcp_nopush;              /* tcp_nopush */
     ngx_flag_t    tcp_nodelay;             /* tcp_nodelay */
     ngx_flag_t    reset_timedout_connection; /* reset_timedout_connection */
@@ -424,14 +412,8 @@ struct ngx_http_core_loc_conf_s {
     ngx_flag_t    log_subrequest;          /* log_subrequest */
     ngx_flag_t    recursive_error_pages;   /* recursive_error_pages */
     ngx_flag_t    server_tokens;           /* server_tokens */
-    ngx_flag_t    server_info;             /* server_info */
     ngx_flag_t    chunked_transfer_encoding; /* chunked_transfer_encoding */
     ngx_flag_t    etag;                    /* etag */
-    ngx_flag_t    request_time_cache;      /* request_time_cache */
-
-    ngx_uint_t    server_tag_type;         /* server tag type */
-    ngx_str_t     server_tag;              /* customized server tag */
-    ngx_str_t     server_tag_header;       /* server tag header */
 
 #if (NGX_HTTP_GZIP)
     ngx_flag_t    gzip_vary;               /* gzip_vary */
@@ -442,6 +424,11 @@ struct ngx_http_core_loc_conf_s {
 #if (NGX_PCRE)
     ngx_array_t  *gzip_disable;            /* gzip_disable */
 #endif
+#endif
+
+#if (NGX_THREADS)
+    ngx_thread_pool_t         *thread_pool;
+    ngx_http_complex_value_t  *thread_pool_value;
 #endif
 
 #if (NGX_HAVE_OPENAT)
@@ -518,10 +505,10 @@ ngx_int_t ngx_http_core_content_phase(ngx_http_request_t *r,
 
 
 void *ngx_http_test_content_type(ngx_http_request_t *r, ngx_hash_t *types_hash);
-void *ngx_http_test_content_type_wildcard(ngx_http_request_t *r, ngx_hash_t *types_hash);
 ngx_int_t ngx_http_set_content_type(ngx_http_request_t *r);
 void ngx_http_set_exten(ngx_http_request_t *r);
 ngx_int_t ngx_http_set_etag(ngx_http_request_t *r);
+void ngx_http_weak_etag(ngx_http_request_t *r);
 ngx_int_t ngx_http_send_response(ngx_http_request_t *r, ngx_uint_t status,
     ngx_str_t *ct, ngx_http_complex_value_t *cv);
 u_char *ngx_http_map_uri_to_path(ngx_http_request_t *r, ngx_str_t *name,
@@ -543,16 +530,17 @@ ngx_int_t ngx_http_named_location(ngx_http_request_t *r, ngx_str_t *name);
 ngx_http_cleanup_t *ngx_http_cleanup_add(ngx_http_request_t *r, size_t size);
 
 
-typedef ngx_int_t (*ngx_http_input_body_filter_pt)
-    (ngx_http_request_t *r, ngx_buf_t *buf);
-
 typedef ngx_int_t (*ngx_http_output_header_filter_pt)(ngx_http_request_t *r);
 typedef ngx_int_t (*ngx_http_output_body_filter_pt)
+    (ngx_http_request_t *r, ngx_chain_t *chain);
+typedef ngx_int_t (*ngx_http_request_body_filter_pt)
     (ngx_http_request_t *r, ngx_chain_t *chain);
 
 
 ngx_int_t ngx_http_output_filter(ngx_http_request_t *r, ngx_chain_t *chain);
 ngx_int_t ngx_http_write_filter(ngx_http_request_t *r, ngx_chain_t *chain);
+ngx_int_t ngx_http_request_body_save_filter(ngx_http_request_t *r,
+   ngx_chain_t *chain);
 
 
 ngx_int_t ngx_http_set_disable_symlinks(ngx_http_request_t *r,
@@ -577,7 +565,7 @@ extern ngx_str_t  ngx_http_core_get_method;
         r->headers_out.content_length->hash = 0;                              \
         r->headers_out.content_length = NULL;                                 \
     }
-                                                                              \
+
 #define ngx_http_clear_accept_ranges(r)                                       \
                                                                               \
     r->allow_ranges = 0;                                                      \

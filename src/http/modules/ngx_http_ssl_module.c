@@ -9,6 +9,9 @@
 #include <ngx_core.h>
 #include <ngx_http.h>
 
+#if NGX_HTTP_SPDY
+#include <ngx_http_spdy_module.h>
+#endif
 
 typedef ngx_int_t (*ngx_ssl_variable_handler_pt)(ngx_connection_t *c,
     ngx_pool_t *pool, ngx_str_t *s);
@@ -71,6 +74,9 @@ static ngx_conf_enum_t  ngx_http_ssl_verify[] = {
 };
 
 
+static ngx_str_t ngx_http_ssl_unknown_server_name = ngx_string("unknown");
+
+
 static ngx_command_t  ngx_http_ssl_commands[] = {
 
     { ngx_string("ssl"),
@@ -78,6 +84,13 @@ static ngx_command_t  ngx_http_ssl_commands[] = {
       ngx_http_ssl_enable,
       NGX_HTTP_SRV_CONF_OFFSET,
       offsetof(ngx_http_ssl_srv_conf_t, enable),
+      NULL },
+
+    { ngx_string("ssl_pass_phrase_dialog"),
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_str_slot,
+      NGX_HTTP_SRV_CONF_OFFSET,
+      offsetof(ngx_http_ssl_srv_conf_t, pass_phrase_dialog),
       NULL },
 
     { ngx_string("ssl_certificate"),
@@ -542,7 +555,6 @@ ngx_http_ssl_create_srv_conf(ngx_conf_t *cf)
     return sscf;
 }
 
-
 static void *
 ngx_http_ssl_create_loc_conf(ngx_conf_t *cf)
 {
@@ -558,14 +570,15 @@ ngx_http_ssl_create_loc_conf(ngx_conf_t *cf)
     return slcf;
 }
 
-
 static char *
 ngx_http_ssl_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
 {
     ngx_http_ssl_srv_conf_t *prev = parent;
     ngx_http_ssl_srv_conf_t *conf = child;
 
-    ngx_pool_cleanup_t  *cln;
+    ngx_pool_cleanup_t                 *cln;
+    ngx_http_core_srv_conf_t           *cscf;
+    ngx_http_ssl_pphrase_dialog_conf_t  dialog;
 
     if (conf->enable == NGX_CONF_UNSET) {
         if (prev->enable == NGX_CONF_UNSET) {
@@ -585,8 +598,8 @@ ngx_http_ssl_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
                          prev->prefer_server_ciphers, 0);
 
     ngx_conf_merge_bitmask_value(conf->protocols, prev->protocols,
-                         (NGX_CONF_BITMASK_SET|NGX_SSL_TLSv1
-                          |NGX_SSL_TLSv1_1|NGX_SSL_TLSv1_2));
+                         (NGX_CONF_BITMASK_SET|NGX_SSL_TLSv1|NGX_SSL_TLSv1_1
+                          |NGX_SSL_TLSv1_2));
 
     ngx_conf_merge_size_value(conf->buffer_size, prev->buffer_size,
                          NGX_SSL_BUFSIZE);
@@ -611,6 +624,9 @@ ngx_http_ssl_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
                          NGX_DEFAULT_ECDH_CURVE);
 
     ngx_conf_merge_str_value(conf->ciphers, prev->ciphers, NGX_DEFAULT_CIPHERS);
+
+    ngx_conf_merge_str_value(conf->pass_phrase_dialog, prev->pass_phrase_dialog,
+                         "builtin");
 
     ngx_conf_merge_value(conf->stapling, prev->stapling, 0);
     ngx_conf_merge_value(conf->stapling_verify, prev->stapling_verify, 0);
@@ -686,6 +702,15 @@ ngx_http_ssl_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
 
     cln->handler = ngx_ssl_cleanup_ctx;
     cln->data = &conf->ssl;
+
+    cscf = ngx_http_conf_get_module_srv_conf(cf, ngx_http_core_module);
+    dialog.ssl = &conf->ssl;
+    dialog.type = &conf->pass_phrase_dialog;
+    if (cscf->server_name.len != 0) {
+        dialog.server_name = &cscf->server_name;
+    } else {
+        dialog.server_name = &ngx_http_ssl_unknown_server_name;
+    }
 
     if (ngx_ssl_certificate(cf, &conf->ssl, &conf->certificate,
                             &conf->certificate_key, conf->passwords)
@@ -986,3 +1011,4 @@ ngx_http_ssl_init(ngx_conf_t *cf)
 
     return NGX_OK;
 }
+
