@@ -108,14 +108,10 @@ struct ngx_module_s {
 
     ngx_uint_t            spare0;
     ngx_uint_t            spare1;
-    ngx_uint_t            spare2;
-    ngx_uint_t            spare3;
     ngx_uint_t            abi_compatibility;
 
     ngx_uint_t            major_version;
     ngx_uint_t            minor_version;
-
-    ngx_uint_t            version;
 
     void                 *ctx;
     ngx_command_t        *commands;

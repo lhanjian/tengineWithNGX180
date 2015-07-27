@@ -51,9 +51,9 @@ struct ngx_log_s {
     ngx_uint_t           log_level;
     ngx_open_file_t     *file;
 
-    time_t               disk_full_time;
-
     ngx_atomic_uint_t    connection;
+
+    time_t               disk_full_time;
 
     ngx_log_handler_pt   handler;
     void                *data;
@@ -250,7 +250,7 @@ char *ngx_log_set_log(ngx_conf_t *cf, ngx_log_t **head);
 static ngx_inline void
 ngx_write_stderr(char *text)
 {
-    (void) ngx_write_fd(ngx_stderr, text, strlen(text));
+    (void) ngx_write_fd(ngx_stderr, text, ngx_strlen(text));
 }
 
 

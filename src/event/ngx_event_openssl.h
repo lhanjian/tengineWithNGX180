@@ -64,6 +64,12 @@ typedef struct {
     unsigned                    handshake_buffer_set:1;
 } ngx_ssl_connection_t;
 
+typedef struct {
+    ngx_ssl_t                  *ssl;
+    ngx_str_t                  *server_name;
+    ngx_str_t                  *type;
+    ngx_str_t                  *encrypt;
+} ngx_http_ssl_pphrase_dialog_conf_t;
 
 #define NGX_SSL_NO_SCACHE            -2
 #define NGX_SSL_NONE_SCACHE          -3
@@ -123,7 +129,7 @@ typedef struct {
 ngx_int_t ngx_ssl_init(ngx_log_t *log);
 ngx_int_t ngx_ssl_create(ngx_ssl_t *ssl, ngx_uint_t protocols, void *data);
 ngx_int_t ngx_ssl_certificate(ngx_conf_t *cf, ngx_ssl_t *ssl,
-    ngx_str_t *cert, ngx_str_t *key, ngx_array_t *passwords);
+    ngx_str_t *cert, ngx_str_t *key, ngx_http_ssl_pphrase_dialog_conf_t *dialog);
 ngx_int_t ngx_ssl_client_certificate(ngx_conf_t *cf, ngx_ssl_t *ssl,
     ngx_str_t *cert, ngx_int_t depth);
 ngx_int_t ngx_ssl_trusted_certificate(ngx_conf_t *cf, ngx_ssl_t *ssl,

@@ -43,7 +43,8 @@ struct ngx_peer_connection_s {
     ngx_str_t                       *host;
 
     ngx_uint_t                       tries;
-    g
+    ngx_msec_t                       start_time;
+
     ngx_event_get_peer_pt            get;
     ngx_event_free_peer_pt           free;
     void                            *data;

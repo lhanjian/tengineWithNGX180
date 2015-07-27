@@ -2559,7 +2559,7 @@ ngx_resolver_rbtree_insert_value(ngx_rbtree_node_t *temp,
         } else { /* node->key == temp->key */
 
             rn = ngx_resolver_node(node);
-            rn_temp = ngx_resolver_node_t(temp);
+            rn_temp = ngx_resolver_node(temp);
 
             p = (ngx_memn2cmp(rn->name, rn_temp->name, rn->nlen, rn_temp->nlen)
                  < 0) ? &temp->left : &temp->right;

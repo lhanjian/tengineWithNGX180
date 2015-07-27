@@ -277,6 +277,7 @@ typedef struct {
 
 typedef void (*ngx_http_client_body_handler_pt)(ngx_http_request_t *r);
 
+typedef struct {
     ngx_temp_file_t                  *temp_file;
     ngx_chain_t                      *bufs;
     ngx_buf_t                        *buf;

@@ -325,6 +325,9 @@ struct ngx_http_upstream_s {
     ngx_chain_writer_ctx_t           writer;
 
     ngx_http_upstream_conf_t        *conf;
+#if (NGX_HTTP_CACHE)
+    ngx_array_t                     *caches;
+#endif
 
     ngx_http_upstream_headers_in_t   headers_in;
 

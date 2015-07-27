@@ -248,7 +248,7 @@ ngx_parse_time(ngx_str_t *line, ngx_uint_t is_sec)
 
         value *= scale;
 
-        if (total > NGX_MAX_INT_T_VALUE) {
+        if (total > NGX_MAX_INT_T_VALUE - value) {
             return NGX_ERROR;
         }
 
@@ -277,5 +277,5 @@ ngx_parse_time(ngx_str_t *line, ngx_uint_t is_sec)
         return NGX_ERROR;
     }
 
-    return total_value;
+    return total + value;
 }

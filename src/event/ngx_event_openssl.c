@@ -18,6 +18,13 @@ typedef struct {
 } ngx_openssl_conf_t;
 
 
+typedef int (ngx_ssl_read_bio_handler_pt)(char *, int, int, void *);
+
+
+static ngx_str_t ngx_pphrase_rsa = ngx_string("RSA");
+static ngx_str_t ngx_pphrase_dsa = ngx_string("DSA");
+
+
 static int ngx_ssl_password_callback(char *buf, int size, int rwflag,
     void *userdata);
 static int ngx_ssl_verify_callback(int ok, X509_STORE_CTX *x509_store);
@@ -59,6 +66,10 @@ static ngx_int_t ngx_ssl_check_name(ngx_str_t *name, ASN1_STRING *str);
 static void *ngx_openssl_create_conf(ngx_cycle_t *cycle);
 static char *ngx_openssl_engine(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 static void ngx_openssl_exit(ngx_cycle_t *cycle);
+static int ngx_ssl_pphrase_handle_cb(char *buf, int size, int rwflag,
+    void *userdata);
+static X509 *ngx_ssl_read_x509(char *filename, X509 **x509,
+    ngx_ssl_read_bio_handler_pt *cb);
 
 
 static ngx_command_t  ngx_openssl_commands[] = {
@@ -265,13 +276,11 @@ ngx_ssl_create(ngx_ssl_t *ssl, ngx_uint_t protocols, void *data)
         SSL_CTX_set_options(ssl->ctx, SSL_OP_NO_TLSv1);
     }
 #ifdef SSL_OP_NO_TLSv1_1
-    SSL_CTX_clear_options(ssl->ctx, SSL_OP_NO_TLSv1_1);
     if (!(protocols & NGX_SSL_TLSv1_1)) {
         SSL_CTX_set_options(ssl->ctx, SSL_OP_NO_TLSv1_1);
     }
 #endif
 #ifdef SSL_OP_NO_TLSv1_2
-    SSL_CTX_clear_options(ssl->ctx, SSL_OP_NO_TLSv1_2);
     if (!(protocols & NGX_SSL_TLSv1_2)) {
         SSL_CTX_set_options(ssl->ctx, SSL_OP_NO_TLSv1_2);
     }
@@ -299,15 +308,43 @@ ngx_ssl_create(ngx_ssl_t *ssl, ngx_uint_t protocols, void *data)
 
 ngx_int_t
 ngx_ssl_certificate(ngx_conf_t *cf, ngx_ssl_t *ssl, ngx_str_t *cert,
-    ngx_str_t *key, ngx_array_t *passwords)
+    ngx_str_t *key, ngx_http_ssl_pphrase_dialog_conf_t *dialog)
 {
-    BIO         *bio;
-    X509        *x509;
-    u_long       n;
-    ngx_str_t   *pwd;
-    ngx_uint_t   tries;
+    BIO        *bio;
+    X509       *certificate, *x509;
+    u_long      n;
+    EVP_PKEY   *pkey;
+    ngx_int_t   pk_type;
 
     if (ngx_conf_full_name(cf->cycle, cert, 1) != NGX_OK) {
+        return NGX_ERROR;
+    }
+
+    certificate = ngx_ssl_read_x509((char *) cert->data, NULL, NULL);
+    if (certificate == NULL) {
+        ngx_ssl_error(NGX_LOG_EMERG, ssl->log, 0,
+                      "cannot get certificate");
+        return NGX_ERROR;
+    }
+
+    pkey = X509_get_pubkey(certificate);
+    pk_type = pkey->type;
+    EVP_PKEY_free(pkey);
+    X509_free(certificate);
+
+    switch (pk_type) {
+
+    case EVP_PKEY_RSA:
+        dialog->encrypt = &ngx_pphrase_rsa;
+        break;
+
+    case EVP_PKEY_DSA:
+        dialog->encrypt = &ngx_pphrase_dsa;
+        break;
+
+    default:
+        ngx_ssl_error(NGX_LOG_EMERG, ssl->log, 0,
+                      "unsupported certificte public key type");
         return NGX_ERROR;
     }
 
@@ -388,106 +425,22 @@ ngx_ssl_certificate(ngx_conf_t *cf, ngx_ssl_t *ssl, ngx_str_t *cert,
 
     BIO_free(bio);
 
-    if (ngx_strncmp(key->data, "engine:", sizeof("engine:") - 1) == 0) {
-
-#ifndef OPENSSL_NO_ENGINE
-
-        u_char      *p, *last;
-        ENGINE      *engine;
-        EVP_PKEY    *pkey;
-
-        p = key->data + sizeof("engine:") - 1;
-        last = (u_char *) ngx_strchr(p, ':');
-
-        if (last == NULL) {
-            ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
-                               "invalid syntax in \"%V\"", key);
-            return NGX_ERROR;
-        }
-
-        *last = '\0';
-
-        engine = ENGINE_by_id((char *) p);
-
-        if (engine == NULL) {
-            ngx_ssl_error(NGX_LOG_EMERG, ssl->log, 0,
-                          "ENGINE_by_id(\"%s\") failed", p);
-            return NGX_ERROR;
-        }
-
-        *last++ = ':';
-
-        pkey = ENGINE_load_private_key(engine, (char *) last, 0, 0);
-
-        if (pkey == NULL) {
-            ngx_ssl_error(NGX_LOG_EMERG, ssl->log, 0,
-                          "ENGINE_load_private_key(\"%s\") failed", last);
-            ENGINE_free(engine);
-            return NGX_ERROR;
-        }
-
-        ENGINE_free(engine);
-
-        if (SSL_CTX_use_PrivateKey(ssl->ctx, pkey) == 0) {
-            ngx_ssl_error(NGX_LOG_EMERG, ssl->log, 0,
-                          "SSL_CTX_use_PrivateKey(\"%s\") failed", last);
-            EVP_PKEY_free(pkey);
-            return NGX_ERROR;
-        }
-
-        EVP_PKEY_free(pkey);
-
-        return NGX_OK;
-
-#else
-
-        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
-                           "loading \"engine:...\" certificate keys "
-                           "is not supported");
-        return NGX_ERROR;
-
-#endif
-    }
 
     if (ngx_conf_full_name(cf->cycle, key, 1) != NGX_OK) {
         return NGX_ERROR;
     }
 
-    if (passwords) {
-        tries = passwords->nelts;
-        pwd = passwords->elts;
+    SSL_CTX_set_default_passwd_cb_userdata(ssl->ctx, dialog);
+    SSL_CTX_set_default_passwd_cb(ssl->ctx, ngx_ssl_pphrase_handle_cb);
 
-        SSL_CTX_set_default_passwd_cb(ssl->ctx, ngx_ssl_password_callback);
-        SSL_CTX_set_default_passwd_cb_userdata(ssl->ctx, pwd);
-
-    } else {
-        tries = 1;
-#if (NGX_SUPPRESS_WARN)
-        pwd = NULL;
-#endif
-    }
-
-    for ( ;; ) {
-
-        if (SSL_CTX_use_PrivateKey_file(ssl->ctx, (char *) key->data,
-                                        SSL_FILETYPE_PEM)
-            != 0)
-        {
-            break;
-        }
-
-        if (--tries) {
-            ERR_clear_error();
-            SSL_CTX_set_default_passwd_cb_userdata(ssl->ctx, ++pwd);
-            continue;
-        }
-
+    if (SSL_CTX_use_PrivateKey_file(ssl->ctx, (char *) key->data,
+                                    SSL_FILETYPE_PEM)
+        == 0)
+    {
         ngx_ssl_error(NGX_LOG_EMERG, ssl->log, 0,
                       "SSL_CTX_use_PrivateKey_file(\"%s\") failed", key->data);
         return NGX_ERROR;
     }
-
-    SSL_CTX_set_default_passwd_cb(ssl->ctx, NULL);
 
     return NGX_OK;
 }
@@ -679,7 +632,7 @@ ngx_ssl_verify_callback(int ok, X509_STORE_CTX *x509_store)
 
     ngx_log_debug5(NGX_LOG_DEBUG_EVENT, c->log, 0,
                    "verify:%d, error:%d, depth:%d, "
-                   "subject:\"%s\", issuer:\"%s\"",
+                   "subject:\"%s\", issuer: \"%s\"",
                    ok, err, depth, subject, issuer);
 
     if (sname) {
@@ -3272,8 +3225,7 @@ ngx_ssl_get_certificate(ngx_connection_t *c, ngx_pool_t *pool, ngx_str_t *s)
     }
 
     return NGX_OK;
-}
-
+} 
 
 ngx_int_t
 ngx_ssl_get_subject_dn(ngx_connection_t *c, ngx_pool_t *pool, ngx_str_t *s)
@@ -3531,5 +3483,129 @@ ngx_openssl_exit(ngx_cycle_t *cycle)
     EVP_cleanup();
 #ifndef OPENSSL_NO_ENGINE
     ENGINE_cleanup();
-#endif
+}
+
+
+static X509 *
+ngx_ssl_read_x509(char *filename, X509 **x509, ngx_ssl_read_bio_handler_pt *cb)
+{
+    X509 *rc;
+    BIO *bioS, *bioF;
+
+    /* 1. try PEM (= DER+Base64+headers) */
+    if ((bioS = BIO_new_file(filename, "r")) == NULL) {
+        return NULL;
+    }
+
+    rc = ngx_ssl_pem_read_bio_x509(bioS, x509, cb, NULL);
+    BIO_free(bioS);
+
+    if (rc == NULL) {
+        /* 2. try DER+Base64 */
+        if ((bioS = BIO_new_file(filename, "r")) == NULL) {
+            return NULL;
+        }
+
+        if ((bioF = BIO_new(BIO_f_base64())) == NULL) {
+            BIO_free(bioS);
+            return NULL;
+        }
+        bioS = BIO_push(bioF, bioS);
+        rc = d2i_X509_bio(bioS, NULL);
+        BIO_free_all(bioS);
+
+        if (rc == NULL) {
+            /* 3. try plain DER */
+            if ((bioS = BIO_new_file(filename, "r")) == NULL) {
+                return NULL;
+            }
+            rc = d2i_X509_bio(bioS, NULL);
+            BIO_free(bioS);
+        }
+    }
+
+    if (rc != NULL && x509 != NULL) {
+        if (*x509 != NULL)
+            X509_free(*x509);
+        *x509 = rc;
+    }
+
+    return rc;
+}
+
+
+static int
+ngx_ssl_pphrase_handle_cb(char *buf, int size, int rwflag, void *conf)
+{
+    int         k, len, ci;
+    FILE       *fp;
+    char        c, b[NGX_MAX_PATH];
+    u_char     *p;
+    ngx_str_t   file;
+
+    static int  first_in = 1;
+
+    ngx_http_ssl_pphrase_dialog_conf_t  *dialog = conf;
+
+    len = -1;
+
+    if (ngx_strcmp(dialog->type->data, (u_char *) "builtin") == 0) {
+        if (first_in) {
+            ngx_log_stderr(0, "Some of your private key files are encrypted "
+                              "for security reasons.\n"
+                              "In order to read them you have to provide "
+                              "the pass phrases.\n");
+            first_in = 0;
+        }
+
+        ngx_log_stderr(0, "Server %V (%V)",
+                       dialog->server_name, dialog->encrypt);
+
+        while (1) {
+            ngx_log_stderr(0, "Enter pass phrase:");
+
+            if ((k = EVP_read_pw_string(buf, size, "", 0)) != 0) {
+                return -1;
+            }
+
+            if ((len = ngx_strlen(buf)) < 1) {
+                ngx_log_stderr(0, "Pass phrase empty (needs to be at least 1 "
+                                  "character).");
+            } else {
+                break;
+            }
+        }
+    } else if (dialog->type->len > sizeof("exec:") - 1 &&
+        ngx_strncmp(dialog->type->data, "exec:", sizeof("exec:") - 1) == 0)
+    {
+        file.len = dialog->type->len - sizeof("exec:") + 1;
+        file.data = dialog->type->data + sizeof("exec:") - 1;
+
+        p = ngx_snprintf((u_char *) b, NGX_MAX_PATH - 1, "%V %V %V",
+                         &file, dialog->server_name, dialog->encrypt);
+        *p = '\0';
+
+        fp = popen(b, "r");
+
+        if (fp == NULL) {
+            return -1;
+        }
+
+        for (k = 0; (ci = fgetc(fp)) != EOF && k < size; /* void */) {
+
+            c = (char) ci;
+
+            if (c == '\n' || c == '\r') {
+                break;
+            }
+
+            buf[k++] = c;
+        }
+        buf[k] = 0;
+        len = ngx_strlen(buf);
+
+        pclose(fp);
+    }
+
+    return len;
 }

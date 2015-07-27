@@ -9,7 +9,7 @@
 #include <ngx_core.h>
 #include <ngx_http.h>
 
-#if NGX_HTTP_SPDY
+#if (NGX_HTTP_SPDY)
 #include <ngx_http_spdy_module.h>
 #endif
 
@@ -106,7 +106,7 @@ static ngx_command_t  ngx_http_ssl_commands[] = {
       NGX_HTTP_SRV_CONF_OFFSET,
       offsetof(ngx_http_ssl_srv_conf_t, certificate_key),
       NULL },
-
+    
     { ngx_string("ssl_password_file"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_CONF_TAKE1,
       ngx_http_ssl_password_file,
@@ -713,7 +713,7 @@ ngx_http_ssl_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
     }
 
     if (ngx_ssl_certificate(cf, &conf->ssl, &conf->certificate,
-                            &conf->certificate_key, conf->passwords)
+                            &conf->certificate_key, &dialog)
         != NGX_OK)
     {
         return NGX_CONF_ERROR;
@@ -1011,4 +1011,3 @@ ngx_http_ssl_init(ngx_conf_t *cf)
 
     return NGX_OK;
 }
-

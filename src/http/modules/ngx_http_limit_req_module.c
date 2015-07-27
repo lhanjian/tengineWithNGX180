@@ -49,7 +49,6 @@ typedef struct {
 
 typedef struct {
     ngx_shm_zone_t              *shm_zone;
-
     /* integer value, 1 corresponds to 0.001 r/s */
     ngx_uint_t                   burst;
     ngx_uint_t                   nodelay; /* unsigned  nodelay:1 */
@@ -74,11 +73,11 @@ typedef struct {
 
 
 static void ngx_http_limit_req_delay(ngx_http_request_t *r);
-static ngx_int_t ngx_http_limit_req_lookup(ngx_http_limit_req_limit_t *limit,
-    ngx_uint_t hash, ngx_str_t *key, ngx_uint_t *ep, ngx_uint_t account);
+static ngx_int_t ngx_http_limit_req_lookup(ngx_http_request_t *r,
+    ngx_http_limit_req_limit_t *limit_req, ngx_uint_t hash, ngx_uint_t *ep);
 static ngx_msec_t ngx_http_limit_req_account(ngx_http_limit_req_limit_t *limits,
     ngx_uint_t n, ngx_uint_t *ep, ngx_http_limit_req_limit_t **limit);
-static void ngx_http_limit_req_expire(ngx_http_limit_req_ctx_t *ctx,
+static void ngx_http_limit_req_expire(ngx_http_request_t *r, ngx_http_limit_req_ctx_t *ctx,
     ngx_uint_t n);
 
 static void *ngx_http_limit_req_create_conf(ngx_conf_t *cf);
@@ -268,7 +267,7 @@ ngx_http_limit_req_handler(ngx_http_request_t *r)
                                    nodelay, i;
     ngx_time_t                    *tp;
     ngx_rbtree_node_t             *node;
-    ngx_http_limit_req_t          *limit_req;
+    ngx_http_limit_req_limit_t    *limit_req;
     ngx_http_limit_req_ctx_t      *ctx;
     ngx_http_limit_req_node_t     *lr;
     ngx_http_limit_req_conf_t     *lrcf;
@@ -519,7 +518,7 @@ ngx_http_limit_req_rbtree_insert_value(ngx_rbtree_node_t *temp,
 
 static ngx_int_t
 ngx_http_limit_req_lookup(ngx_http_request_t *r,
-    ngx_http_limit_req_t *limit_req, ngx_uint_t hash, ngx_uint_t *ep)
+    ngx_http_limit_req_limit_t *limit_req, ngx_uint_t hash, ngx_uint_t *ep)
 {
     u_char                          *lr_data, *lr_last;
     size_t                           lr_vv_len;
@@ -993,7 +992,7 @@ ngx_http_limit_req(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     ngx_str_t                     *value, s, forbid_action;
     ngx_uint_t                     i, nodelay;
     ngx_shm_zone_t                *shm_zone;
-    ngx_http_limit_req_t          *limit_req;
+    ngx_http_limit_req_limit_t    *limit_req;
 
     value = cf->args->elts;
     if (cf->args->nelts == 2) {
@@ -1080,7 +1079,7 @@ ngx_http_limit_req(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     if (lrcf->rules == NULL) {
         lrcf->rules = ngx_array_create(cf->pool, 5,
-                                       sizeof(ngx_http_limit_req_t));
+                                       sizeof(ngx_http_limit_req_limit_t));
         if (lrcf->rules == NULL) {
             return NGX_CONF_ERROR;
         }
@@ -1099,7 +1098,7 @@ ngx_http_limit_req(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         return NGX_CONF_ERROR;
     }
 
-    ngx_memzero(limit_req, sizeof(ngx_http_limit_req_t));
+    ngx_memzero(limit_req, sizeof(ngx_http_limit_req_limit_t));
 
     limit_req->shm_zone = shm_zone;
     limit_req->burst = burst * 1000;

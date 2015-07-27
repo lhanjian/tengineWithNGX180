@@ -559,6 +559,7 @@ ngx_http_upstream_init_request(ngx_http_request_t *r)
         if (rc == NGX_ERROR) {
             ngx_http_finalize_request(r, NGX_HTTP_INTERNAL_SERVER_ERROR);
             return;
+        }
 
         if (rc != NGX_DECLINED) {
             ngx_http_finalize_request(r, rc);
@@ -2833,10 +2834,6 @@ ngx_http_upstream_send_response(ngx_http_request_t *r, ngx_http_upstream_t *u)
 
         if (u->cache_status == NGX_HTTP_CACHE_BYPASS) {
 
-            r->cache->min_uses = u->conf->cache_min_uses;
-            r->cache->body_start = u->conf->buffer_size;
-            r->cache->file_cache = u->conf->cache->data;
-
             /* create cache if previously bypassed */
 
             if (ngx_http_file_cache_create(r) != NGX_OK) {
@@ -3663,14 +3660,12 @@ ngx_http_upstream_process_upstream(ngx_http_request_t *r,
 
 
 static void
-ngx_http_upstream_process_request(ngx_http_request_t *r
+ngx_http_upstream_process_request(ngx_http_request_t *r,
     ngx_http_upstream_t *u)
 {
     ngx_temp_file_t      *tf;
     ngx_event_pipe_t     *p;
-    ngx_http_upstream_t  *u;
 
-    u = r->upstream;
     p = u->pipe;
 
     if (u->peer.connection) {

@@ -378,8 +378,6 @@ ngx_start_worker_processes(ngx_cycle_t *cycle, ngx_int_t n, ngx_int_t type)
 
     ch.command = NGX_CMD_OPEN_CHANNEL;
 
-#endif
-
     for (i = 0; i < n; i++) {
 
         ngx_spawn_process(cycle, ngx_worker_process_cycle,
@@ -594,9 +592,6 @@ ngx_reap_children(ngx_cycle_t *cycle)
     ch.fd = -1;
 
     live = 0;
-
-#endif
-
     for (i = 0; i < ngx_last_process; i++) {
 
         ngx_log_debug7(NGX_LOG_DEBUG_EVENT, cycle->log, 0,
@@ -1182,89 +1177,6 @@ ngx_channel_handler(ngx_event_t *ev)
         }
     }
 }
-
-
-static ngx_thread_value_t
-ngx_worker_thread_cycle(void *data)
-{
-    ngx_thread_t  *thr = data;
-
-    sigset_t          set;
-    ngx_err_t         err;
-    ngx_core_tls_t   *tls;
-    ngx_cycle_t      *cycle;
-
-    cycle = (ngx_cycle_t *) ngx_cycle;
-
-    sigemptyset(&set);
-    sigaddset(&set, ngx_signal_value(NGX_RECONFIGURE_SIGNAL));
-    sigaddset(&set, ngx_signal_value(NGX_REOPEN_SIGNAL));
-    sigaddset(&set, ngx_signal_value(NGX_CHANGEBIN_SIGNAL));
-
-    err = ngx_thread_sigmask(SIG_BLOCK, &set, NULL);
-    if (err) {
-        ngx_log_error(NGX_LOG_ALERT, cycle->log, err,
-                      ngx_thread_sigmask_n " failed");
-        return (ngx_thread_value_t) 1;
-    }
-
-    ngx_log_debug1(NGX_LOG_DEBUG_CORE, cycle->log, 0,
-                   "thread " NGX_TID_T_FMT " started", ngx_thread_self());
-
-    ngx_setthrtitle("worker thread");
-
-    tls = ngx_calloc(sizeof(ngx_core_tls_t), cycle->log);
-    if (tls == NULL) {
-        return (ngx_thread_value_t) 1;
-    }
-
-    err = ngx_thread_set_tls(ngx_core_tls_key, tls);
-    if (err != 0) {
-        ngx_log_error(NGX_LOG_ALERT, cycle->log, err,
-                      ngx_thread_set_tls_n " failed");
-        return (ngx_thread_value_t) 1;
-    }
-
-    ngx_mutex_lock(ngx_posted_events_mutex);
-
-    for ( ;; ) {
-        thr->state = NGX_THREAD_FREE;
-
-        if (ngx_cond_wait(thr->cv, ngx_posted_events_mutex) == NGX_ERROR) {
-            return (ngx_thread_value_t) 1;
-        }
-
-        if (ngx_terminate) {
-            thr->state = NGX_THREAD_EXIT;
-
-            ngx_mutex_unlock(ngx_posted_events_mutex);
-
-            ngx_log_debug1(NGX_LOG_DEBUG_CORE, cycle->log, 0,
-                           "thread " NGX_TID_T_FMT " is done",
-                           ngx_thread_self());
-
-            return (ngx_thread_value_t) 0;
-        }
-
-        thr->state = NGX_THREAD_BUSY;
-
-        if (ngx_event_thread_process_posted(cycle) == NGX_ERROR) {
-            return (ngx_thread_value_t) 1;
-        }
-
-        if (ngx_event_thread_process_posted(cycle) == NGX_ERROR) {
-            return (ngx_thread_value_t) 1;
-        }
-
-        if (ngx_process_changes) {
-            if (ngx_process_changes(cycle, 1) == NGX_ERROR) {
-                return (ngx_thread_value_t) 1;
-            }
-        }
-    }
-}
-
-#endif
 
 
 static void

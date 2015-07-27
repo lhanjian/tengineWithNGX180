@@ -24,8 +24,6 @@ static ngx_int_t ngx_http_request_body_length_filter(ngx_http_request_t *r,
     ngx_chain_t *in);
 static ngx_int_t ngx_http_request_body_chunked_filter(ngx_http_request_t *r,
     ngx_chain_t *in);
-static ngx_int_t ngx_http_request_body_save_filter(ngx_http_request_t *r,
-    ngx_chain_t *in);
 
 
 ngx_int_t
@@ -268,26 +266,6 @@ ngx_http_read_unbuffered_request_body(ngx_http_request_t *r)
 }
 
 
-ngx_int_t
-ngx_http_read_unbuffered_request_body(ngx_http_request_t *r)
-{
-    ngx_int_t  rc;
-
-    if (r->connection->read->timedout) {
-        r->connection->timedout = 1;
-        return NGX_HTTP_REQUEST_TIME_OUT;
-    }
-
-    rc = ngx_http_do_read_client_request_body(r);
-
-    if (rc == NGX_OK) {
-        r->reading_body = 0;
-    }
-
-    return rc;
-}
-
-
 static void
 ngx_http_read_client_request_body_handler(ngx_http_request_t *r)
 {
@@ -402,8 +380,6 @@ ngx_http_do_read_client_request_body(ngx_http_request_t *r)
 
             rb->buf->last += n;
             r->request_length += n;
-
-            c->received += n;
 
             if (n == rest) {
                 /* pass buffer to request body filter chain */
@@ -1196,26 +1172,12 @@ ngx_http_request_body_save_filter(ngx_http_request_t *r, ngx_chain_t *in)
         return NGX_HTTP_INTERNAL_SERVER_ERROR;
     }
 
-    for (cl = in; cl; cl = cl->next) {
-        rc = ngx_http_top_input_body_filter(r, cl->buf);
-        if (rc != NGX_OK) {
-            if (rc > NGX_OK && rc < NGX_HTTP_SPECIAL_RESPONSE) {
-                ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                              "input filter: return code 1xx or 2xx "
-                              "will cause trouble and is converted to 500");
-            }
-
-            /**
-             * NGX_OK: success and continue;
-             * NGX_ERROR: failed and exit;
-             * NGX_AGAIN: not ready and retry later.
-             */
-
-            if (rc < NGX_HTTP_SPECIAL_RESPONSE && rc != NGX_AGAIN) {
-                rc = NGX_HTTP_INTERNAL_SERVER_ERROR;
-            }
-
-            return rc;
+    if (rb->rest > 0
+        && rb->buf && rb->buf->last == rb->buf->end
+        && !r->request_body_no_buffering)
+    {
+        if (ngx_http_write_request_body(r) != NGX_OK) {
+            return NGX_HTTP_INTERNAL_SERVER_ERROR;
         }
     }
 

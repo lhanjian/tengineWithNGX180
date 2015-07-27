@@ -13,6 +13,12 @@
 #define NGINX_VERSION      "1.8.0"
 #define NGINX_VER          "nginx/" NGINX_VERSION
 
+#ifdef NGX_BUILD
+#define NGINX_VER_BUILD    NGINX_VER " (" NGX_BUILD ")"
+#else
+#define NGINX_VER_BUILD    NGINX_VER
+#endif
+
 #define TENGINE            "Tengine"
 #define tengine_version    2001000
 #define TENGINE_VERSION    "2.1.0"

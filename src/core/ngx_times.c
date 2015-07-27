@@ -29,6 +29,7 @@ volatile ngx_str_t       ngx_cached_err_log_time;
 volatile ngx_str_t       ngx_cached_http_time;
 volatile ngx_str_t       ngx_cached_http_log_time;
 volatile ngx_str_t       ngx_cached_http_log_iso8601;
+volatile ngx_str_t       ngx_cached_syslog_time;
 volatile ngx_tm_t       *ngx_cached_tm;
 
 #if !(NGX_WIN32)
@@ -175,6 +176,13 @@ ngx_time_update(void)
                        tp->gmtoff < 0 ? '-' : '+',
                        ngx_abs(tp->gmtoff / 60), ngx_abs(tp->gmtoff % 60));
 
+    p4 = &cached_syslog_time[slot][0];
+
+    (void) ngx_sprintf(p4, "%s %2d %02d:%02d:%02d",
+                       months[tm.ngx_tm_mon - 1], tm.ngx_tm_mday,
+                       tm.ngx_tm_hour, tm.ngx_tm_min, tm.ngx_tm_sec);
+
+
 
     ngx_memory_barrier();
 
@@ -184,9 +192,7 @@ ngx_time_update(void)
     ngx_cached_err_log_time.data = p1;
     ngx_cached_http_log_time.data = p2;
     ngx_cached_http_log_iso8601.data = p3;
-#if (NGX_SYSLOG)
     ngx_cached_syslog_time.data = p4;
-#endif
 
     ngx_unlock(&ngx_time_lock);
 }
