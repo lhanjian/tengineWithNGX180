@@ -3483,6 +3483,7 @@ ngx_openssl_exit(ngx_cycle_t *cycle)
     EVP_cleanup();
 #ifndef OPENSSL_NO_ENGINE
     ENGINE_cleanup();
+#endif
 }
 
 

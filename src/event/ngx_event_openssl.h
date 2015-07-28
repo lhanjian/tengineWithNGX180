@@ -217,5 +217,12 @@ extern int  ngx_ssl_session_ticket_keys_index;
 extern int  ngx_ssl_certificate_index;
 extern int  ngx_ssl_stapling_index;
 
+#if (OPENSSL_VERSION_NUMBER < 0x00904000)
+#define ngx_ssl_pem_read_bio_x509(b, x, cb, arg)    \
+    PEM_read_bio_X509(b, x, cb)
+#else
+#define ngx_ssl_pem_read_bio_x509(b, x, cb, arg)    \
+    PEM_read_bio_X509(b, x, cb, arg)
+#endif
 
 #endif /* _NGX_EVENT_OPENSSL_H_INCLUDED_ */
