@@ -74,10 +74,8 @@ ngx_atomic_t   ngx_stat_writing0;
 ngx_atomic_t  *ngx_stat_writing = &ngx_stat_writing0;
 ngx_atomic_t   ngx_stat_waiting0;
 ngx_atomic_t  *ngx_stat_waiting = &ngx_stat_waiting0;
-#if (TENGINE_STAT_STUB)
 ngx_atomic_t   ngx_stat_request_time0;
 ngx_atomic_t  *ngx_stat_request_time = &ngx_stat_request_time0;
-#endif
 
 #endif
 

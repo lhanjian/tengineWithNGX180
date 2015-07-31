@@ -65,7 +65,7 @@ $t->run();
 
 ###############################################################################
 
-like(http_get_host("/", "www.taobao.com"), qr/HTTP\/1.1 200 OK/, 'auto read /etc/resolv.conf');
+like(http_get_host("/", "www.taobao.com"), qr/HTTP\/1.1 302/, 'auto read /etc/resolv.conf');
 
 $t->stop();
 ###############################################################################
@@ -104,7 +104,7 @@ $t->write_file('resolv.conf', 'nameserver 8.8.8.8');
 
 $t->run();
 
-like(http_get_host("/", "www.taobao.com"), qr/HTTP\/1.1 200 OK/, 'resolver_file to resolv.conf');
+like(http_get_host("/", "www.taobao.com"), qr/HTTP\/1.1 302/, 'resolver_file to resolv.conf');
 
 $t->stop();
 ###############################################################################
@@ -143,7 +143,7 @@ $t->write_file('resolv2.conf', '   nameserver     8.8.8.8   ');
 
 $t->run();
 
-like(http_get_host("/", "www.taobao.com"), qr/HTTP\/1.1 200 OK/, 'resolver_file to resolv2.conf');
+like(http_get_host("/", "www.taobao.com"), qr/HTTP\/1.1 302/, 'resolver_file to resolv2.conf');
 
 $t->stop();
 ###############################################################################
@@ -185,7 +185,7 @@ EOF
 
 $t->run();
 
-like(http_get_host("/", "www.taobao.com"), qr/HTTP\/1.1 200 OK/, 'resolver_file to resolv3.conf');
+like(http_get_host("/", "www.taobao.com"), qr/HTTP\/1.1 302/, 'resolver_file to resolv3.conf');
 
 $t->stop();
 ###############################################################################
@@ -230,7 +230,7 @@ EOF
 
 $t->run();
 
-like(http_get_host("/", "www.taobao.com"), qr/HTTP\/1.1 200 OK/, 'resolver_file to resolv4.conf');
+like(http_get_host("/", "www.taobao.com"), qr/HTTP\/1.1 302/, 'resolver_file to resolv4.conf');
 
 $t->stop();
 ###############################################################################

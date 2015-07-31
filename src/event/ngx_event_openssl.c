@@ -308,43 +308,15 @@ ngx_ssl_create(ngx_ssl_t *ssl, ngx_uint_t protocols, void *data)
 
 ngx_int_t
 ngx_ssl_certificate(ngx_conf_t *cf, ngx_ssl_t *ssl, ngx_str_t *cert,
-    ngx_str_t *key, ngx_http_ssl_pphrase_dialog_conf_t *dialog)
+    ngx_str_t *key, ngx_array_t *passwords)
 {
-    BIO        *bio;
-    X509       *certificate, *x509;
-    u_long      n;
-    EVP_PKEY   *pkey;
-    ngx_int_t   pk_type;
+    BIO         *bio;
+    X509        *x509;
+    u_long       n;
+    ngx_str_t   *pwd;
+    ngx_uint_t   tries;
 
     if (ngx_conf_full_name(cf->cycle, cert, 1) != NGX_OK) {
-        return NGX_ERROR;
-    }
-
-    certificate = ngx_ssl_read_x509((char *) cert->data, NULL, NULL);
-    if (certificate == NULL) {
-        ngx_ssl_error(NGX_LOG_EMERG, ssl->log, 0,
-                      "cannot get certificate");
-        return NGX_ERROR;
-    }
-
-    pkey = X509_get_pubkey(certificate);
-    pk_type = pkey->type;
-    EVP_PKEY_free(pkey);
-    X509_free(certificate);
-
-    switch (pk_type) {
-
-    case EVP_PKEY_RSA:
-        dialog->encrypt = &ngx_pphrase_rsa;
-        break;
-
-    case EVP_PKEY_DSA:
-        dialog->encrypt = &ngx_pphrase_dsa;
-        break;
-
-    default:
-        ngx_ssl_error(NGX_LOG_EMERG, ssl->log, 0,
-                      "unsupported certificte public key type");
         return NGX_ERROR;
     }
 
@@ -425,22 +397,106 @@ ngx_ssl_certificate(ngx_conf_t *cf, ngx_ssl_t *ssl, ngx_str_t *cert,
 
     BIO_free(bio);
 
+    if (ngx_strncmp(key->data, "engine:", sizeof("engine:") - 1) == 0) {
+
+#ifndef OPENSSL_NO_ENGINE
+
+        u_char      *p, *last;
+        ENGINE      *engine;
+        EVP_PKEY    *pkey;
+
+        p = key->data + sizeof("engine:") - 1;
+        last = (u_char *) ngx_strchr(p, ':');
+
+        if (last == NULL) {
+            ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                               "invalid syntax in \"%V\"", key);
+            return NGX_ERROR;
+        }
+
+        *last = '\0';
+
+        engine = ENGINE_by_id((char *) p);
+
+        if (engine == NULL) {
+            ngx_ssl_error(NGX_LOG_EMERG, ssl->log, 0,
+                          "ENGINE_by_id(\"%s\") failed", p);
+            return NGX_ERROR;
+        }
+
+        *last++ = ':';
+
+        pkey = ENGINE_load_private_key(engine, (char *) last, 0, 0);
+
+        if (pkey == NULL) {
+            ngx_ssl_error(NGX_LOG_EMERG, ssl->log, 0,
+                          "ENGINE_load_private_key(\"%s\") failed", last);
+            ENGINE_free(engine);
+            return NGX_ERROR;
+        }
+
+        ENGINE_free(engine);
+
+        if (SSL_CTX_use_PrivateKey(ssl->ctx, pkey) == 0) {
+            ngx_ssl_error(NGX_LOG_EMERG, ssl->log, 0,
+                          "SSL_CTX_use_PrivateKey(\"%s\") failed", last);
+            EVP_PKEY_free(pkey);
+            return NGX_ERROR;
+        }
+
+        EVP_PKEY_free(pkey);
+
+        return NGX_OK;
+
+#else
+
+        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                           "loading \"engine:...\" certificate keys "
+                           "is not supported");
+        return NGX_ERROR;
+
+#endif
+    }
 
     if (ngx_conf_full_name(cf->cycle, key, 1) != NGX_OK) {
         return NGX_ERROR;
     }
 
-    SSL_CTX_set_default_passwd_cb_userdata(ssl->ctx, dialog);
-    SSL_CTX_set_default_passwd_cb(ssl->ctx, ngx_ssl_pphrase_handle_cb);
+    if (passwords) {
+        tries = passwords->nelts;
+        pwd = passwords->elts;
 
-    if (SSL_CTX_use_PrivateKey_file(ssl->ctx, (char *) key->data,
-                                    SSL_FILETYPE_PEM)
-        == 0)
-    {
+        SSL_CTX_set_default_passwd_cb(ssl->ctx, ngx_ssl_password_callback);
+        SSL_CTX_set_default_passwd_cb_userdata(ssl->ctx, pwd);
+
+    } else {
+        tries = 1;
+#if (NGX_SUPPRESS_WARN)
+        pwd = NULL;
+#endif
+    }
+
+    for ( ;; ) {
+
+        if (SSL_CTX_use_PrivateKey_file(ssl->ctx, (char *) key->data,
+                                        SSL_FILETYPE_PEM)
+            != 0)
+        {
+            break;
+        }
+
+        if (--tries) {
+            ERR_clear_error();
+            SSL_CTX_set_default_passwd_cb_userdata(ssl->ctx, ++pwd);
+            continue;
+        }
+
         ngx_ssl_error(NGX_LOG_EMERG, ssl->log, 0,
                       "SSL_CTX_use_PrivateKey_file(\"%s\") failed", key->data);
         return NGX_ERROR;
     }
+
+    SSL_CTX_set_default_passwd_cb(ssl->ctx, NULL);
 
     return NGX_OK;
 }

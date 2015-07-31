@@ -456,6 +456,21 @@ ngx_log_redirect_stderr(ngx_cycle_t *cycle)
 }
 
 
+ngx_log_t *
+ngx_log_get_file_log(ngx_log_t *head)
+{
+    ngx_log_t  *log;
+
+    for (log = head; log; log = log->next) {
+        if (log->file != NULL) {
+            return log;
+        }
+    }
+
+    return NULL;
+}
+
+
 static char *
 ngx_log_set_levels(ngx_conf_t *cf, ngx_log_t *log)
 {
