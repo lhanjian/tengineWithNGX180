@@ -75,8 +75,6 @@ typedef struct {
 static void ngx_http_limit_req_delay(ngx_http_request_t *r);
 static ngx_int_t ngx_http_limit_req_lookup(ngx_http_request_t *r,
     ngx_http_limit_req_limit_t *limit_req, ngx_uint_t hash, ngx_uint_t *ep);
-static ngx_msec_t ngx_http_limit_req_account(ngx_http_limit_req_limit_t *limits,
-    ngx_uint_t n, ngx_uint_t *ep, ngx_http_limit_req_limit_t **limit);
 static void ngx_http_limit_req_expire(ngx_http_request_t *r, ngx_http_limit_req_ctx_t *ctx,
     ngx_uint_t n);
 
