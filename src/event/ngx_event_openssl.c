@@ -62,10 +62,6 @@ static ngx_int_t ngx_ssl_check_name(ngx_str_t *name, ASN1_STRING *str);
 static void *ngx_openssl_create_conf(ngx_cycle_t *cycle);
 static char *ngx_openssl_engine(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 static void ngx_openssl_exit(ngx_cycle_t *cycle);
-static int ngx_ssl_pphrase_handle_cb(char *buf, int size, int rwflag,
-    void *userdata);
-static X509 *ngx_ssl_read_x509(char *filename, X509 **x509,
-    ngx_ssl_read_bio_handler_pt *cb);
 
 
 static ngx_command_t  ngx_openssl_commands[] = {
@@ -3538,52 +3534,4 @@ ngx_openssl_exit(ngx_cycle_t *cycle)
 #ifndef OPENSSL_NO_ENGINE
     ENGINE_cleanup();
 #endif
-}
-
-
-static X509 *
-ngx_ssl_read_x509(char *filename, X509 **x509, ngx_ssl_read_bio_handler_pt *cb)
-{
-    X509 *rc;
-    BIO *bioS, *bioF;
-
-    /* 1. try PEM (= DER+Base64+headers) */
-    if ((bioS = BIO_new_file(filename, "r")) == NULL) {
-        return NULL;
-    }
-
-    rc = ngx_ssl_pem_read_bio_x509(bioS, x509, cb, NULL);
-    BIO_free(bioS);
-
-    if (rc == NULL) {
-        /* 2. try DER+Base64 */
-        if ((bioS = BIO_new_file(filename, "r")) == NULL) {
-            return NULL;
-        }
-
-        if ((bioF = BIO_new(BIO_f_base64())) == NULL) {
-            BIO_free(bioS);
-            return NULL;
-        }
-        bioS = BIO_push(bioF, bioS);
-        rc = d2i_X509_bio(bioS, NULL);
-        BIO_free_all(bioS);
-
-        if (rc == NULL) {
-            /* 3. try plain DER */
-            if ((bioS = BIO_new_file(filename, "r")) == NULL) {
-                return NULL;
-            }
-            rc = d2i_X509_bio(bioS, NULL);
-            BIO_free(bioS);
-        }
-    }
-
-    if (rc != NULL && x509 != NULL) {
-        if (*x509 != NULL)
-            X509_free(*x509);
-        *x509 = rc;
-    }
-
-    return rc;
 }
