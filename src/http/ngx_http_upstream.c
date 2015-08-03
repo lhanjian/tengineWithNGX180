@@ -97,7 +97,7 @@ static ngx_int_t ngx_http_upstream_process_header_line(ngx_http_request_t *r,
 static ngx_int_t ngx_http_upstream_process_content_length(ngx_http_request_t *r,
     ngx_table_elt_t *h, ngx_uint_t offset);
 static ngx_int_t ngx_http_upstream_process_last_modified(ngx_http_request_t *r,
-    ngx_table_elt_t *h, ngx_uint_t offset);
+            ngx_table_elt_t *h, ngx_uint_t offset);
 static ngx_int_t ngx_http_upstream_process_set_cookie(ngx_http_request_t *r,
     ngx_table_elt_t *h, ngx_uint_t offset);
 static ngx_int_t
@@ -211,8 +211,7 @@ ngx_http_upstream_header_t  ngx_http_upstream_headers_in[] = {
                  offsetof(ngx_http_headers_out_t, date), 0 },
 
     { ngx_string("Last-Modified"),
-                 ngx_http_upstream_process_header_line,
-                 offsetof(ngx_http_upstream_headers_in_t, last_modified),
+                 ngx_http_upstream_process_last_modified, 0,
                  ngx_http_upstream_copy_last_modified, 0, 0 },
 
     { ngx_string("ETag"),
@@ -4192,6 +4191,29 @@ ngx_http_upstream_process_content_length(ngx_http_request_t *r,
 
     u->headers_in.content_length = h;
     u->headers_in.content_length_n = ngx_atoof(h->value.data, h->value.len);
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_http_upstream_process_last_modified(ngx_http_request_t *r,
+    ngx_table_elt_t *h, ngx_uint_t offset)
+{
+    ngx_http_upstream_t  *u;
+
+    u = r->upstream;
+
+    u->headers_in.last_modified = h;
+
+#if (NGX_HTTP_CACHE)
+
+    if (u->cacheable) {
+        u->headers_in.last_modified_time = ngx_parse_http_time(h->value.data,
+                                                               h->value.len);
+    }
+
+#endif
 
     return NGX_OK;
 }
