@@ -2339,7 +2339,6 @@ void
 ngx_http_run_posted_requests(ngx_connection_t *c)
 {
     ngx_http_request_t         *r;
-    ngx_http_log_ctx_t         *ctx;
     ngx_http_posted_request_t  *pr;
 
     for ( ;; ) {
