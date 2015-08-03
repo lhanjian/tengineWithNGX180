@@ -4209,7 +4209,7 @@ ngx_http_upstream_process_last_modified(ngx_http_request_t *r,
 #if (NGX_HTTP_CACHE)
 
     if (u->cacheable) {
-        u->headers_in.last_modified_time = ngx_parse_http_time(h->value.data,
+        u->headers_in.last_modified_time = ngx_http_parse_time(h->value.data,
                                                                h->value.len);
     }
 
