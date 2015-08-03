@@ -548,7 +548,6 @@ ngx_error_log(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 char *
 ngx_log_set_log(ngx_conf_t *cf, ngx_log_t **head)
 {
-    ngx_int_t   rc;
     ngx_log_t  *new_log;
     ngx_str_t  *value, name;
     ngx_syslog_peer_t  *peer;

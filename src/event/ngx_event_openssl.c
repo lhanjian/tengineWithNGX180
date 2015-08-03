@@ -21,10 +21,6 @@ typedef struct {
 typedef int (ngx_ssl_read_bio_handler_pt)(char *, int, int, void *);
 
 
-static ngx_str_t ngx_pphrase_rsa = ngx_string("RSA");
-static ngx_str_t ngx_pphrase_dsa = ngx_string("DSA");
-
-
 static int ngx_ssl_password_callback(char *buf, int size, int rwflag,
     void *userdata);
 static int ngx_ssl_verify_callback(int ok, X509_STORE_CTX *x509_store);
@@ -3590,81 +3586,4 @@ ngx_ssl_read_x509(char *filename, X509 **x509, ngx_ssl_read_bio_handler_pt *cb)
     }
 
     return rc;
-}
-
-
-static int
-ngx_ssl_pphrase_handle_cb(char *buf, int size, int rwflag, void *conf)
-{
-    int         k, len, ci;
-    FILE       *fp;
-    char        c, b[NGX_MAX_PATH];
-    u_char     *p;
-    ngx_str_t   file;
-
-    static int  first_in = 1;
-
-    ngx_http_ssl_pphrase_dialog_conf_t  *dialog = conf;
-
-    len = -1;
-
-    if (ngx_strcmp(dialog->type->data, (u_char *) "builtin") == 0) {
-        if (first_in) {
-            ngx_log_stderr(0, "Some of your private key files are encrypted "
-                              "for security reasons.\n"
-                              "In order to read them you have to provide "
-                              "the pass phrases.\n");
-            first_in = 0;
-        }
-
-        ngx_log_stderr(0, "Server %V (%V)",
-                       dialog->server_name, dialog->encrypt);
-
-        while (1) {
-            ngx_log_stderr(0, "Enter pass phrase:");
-
-            if ((k = EVP_read_pw_string(buf, size, "", 0)) != 0) {
-                return -1;
-            }
-
-            if ((len = ngx_strlen(buf)) < 1) {
-                ngx_log_stderr(0, "Pass phrase empty (needs to be at least 1 "
-                                  "character).");
-            } else {
-                break;
-            }
-        }
-    } else if (dialog->type->len > sizeof("exec:") - 1 &&
-        ngx_strncmp(dialog->type->data, "exec:", sizeof("exec:") - 1) == 0)
-    {
-        file.len = dialog->type->len - sizeof("exec:") + 1;
-        file.data = dialog->type->data + sizeof("exec:") - 1;
-
-        p = ngx_snprintf((u_char *) b, NGX_MAX_PATH - 1, "%V %V %V",
-                         &file, dialog->server_name, dialog->encrypt);
-        *p = '\0';
-
-        fp = popen(b, "r");
-
-        if (fp == NULL) {
-            return -1;
-        }
-
-        for (k = 0; (ci = fgetc(fp)) != EOF && k < size; /* void */) {
-
-            c = (char) ci;
-
-            if (c == '\n' || c == '\r') {
-                break;
-            }
-
-            buf[k++] = c;
-        }
-        buf[k] = 0;
-        len = ngx_strlen(buf);
-
-        pclose(fp);
-    }
-
-    return len;
 }
