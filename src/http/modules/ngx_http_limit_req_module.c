@@ -1067,14 +1067,14 @@ ngx_http_limit_req(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
                            &cmd->name);
         return NGX_CONF_ERROR;
     }
-
+/*
     if (shm_zone->data == NULL) {
         ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
                            "unknown limit_req_zone \"%V\"",
                            &shm_zone->shm.name);
         return NGX_CONF_ERROR;
     }
-
+*/
     if (lrcf->rules == NULL) {
         lrcf->rules = ngx_array_create(cf->pool, 5,
                                        sizeof(ngx_http_limit_req_limit_t));
