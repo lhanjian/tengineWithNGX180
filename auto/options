@@ -109,6 +109,7 @@ NGX_ALL_MODULES="
     ngx_http_slice_module
     ngx_http_concat_module
     ngx_http_tfs_module
+    ngx_http_upstream_hash_module
     ngx_http_upstream_ip_hash_module
     ngx_http_upstream_least_conn_module
     ngx_http_upstream_keepalive_module
@@ -252,6 +253,7 @@ HTTP_SLICE=NO
 HTTP_MP4=NO
 HTTP_GUNZIP=NO
 HTTP_GZIP_STATIC=NO
+HTTP_UPSTREAM_HASH=YES
 HTTP_UPSTREAM_IP_HASH=YES
 HTTP_FOOTER=YES
 HTTP_TRIM=YES
@@ -306,6 +308,7 @@ HTTP_LIMIT_REQ_SHARED=NO
 HTTP_EMPTY_GIF_SHARED=NO
 HTTP_BROWSER_SHARED=NO
 HTTP_USER_AGENT_SHARED=NO
+HTTP_UPSTREAM_HASH_SHARED=NO
 HTTP_UPSTREAM_IP_HASH_SHARED=NO
 HTTP_UPSTREAM_LEAST_CONN_SHARED=NO
 HTTP_UPSTREAM_SESSION_STICKY_SHARED=NO
@@ -542,6 +545,9 @@ do
                                                    HTTP_BROWSER=NO                   ;;
         --with-http_user_agent_module=shared)      HTTP_USER_AGENT_SHARED=YES
                                                    HTTP_USER_AGENT=NO                ;;
+        --with-http_upstream_hash_module=shared)
+                                                   HTTP_UPSTREAM_HASH_SHARED=YES
+                                                   HTTP_UPSTREAM_HASH=NO          ;;
         --with-http_upstream_ip_hash_module=shared)
                                                    HTTP_UPSTREAM_IP_HASH_SHARED=YES
                                                    HTTP_UPSTREAM_IP_HASH=NO          ;;
@@ -611,6 +617,8 @@ use the \"--without-http_limit_conn_module\" option instead"
                                          HTTP_BROWSER_SHARED=NO     ;;
         --without-http_user_agent_module) HTTP_USER_AGENT=NO
                                           HTTP_USER_AGENT_SHARED=NO ;;
+        --without-http_upstream_hash_module) HTTP_UPSTREAM_HASH=NO
+                                                HTTP_UPSTREAM_HASH_SHARED=NO ;;
         --without-http_upstream_ip_hash_module) HTTP_UPSTREAM_IP_HASH=NO
                                                 HTTP_UPSTREAM_IP_HASH_SHARED=NO ;;
         --without-http_upstream_check_module)   HTTP_UPSTREAM_CHECK=NO ;;
@@ -827,6 +835,8 @@ cat << END
   --with-http_browser_module=shared  enable ngx_http_browser_module (shared)
   --with-http_user_agent_module=shared
                                      enable ngx_http_user_agent_module (shared)
+  --with-http_upstream_hash_module=shared
+                                     enable ngx_http_upstream_hash_module (shared)
   --with-http_upstream_ip_hash_module=shared
                                      enable ngx_http_upstream_ip_hash_module (shared)
   --with-http_upstream_least_conn_module=shared
@@ -871,6 +881,8 @@ cat << END
                                      disable ngx_http_upstream_keepalive_module
   --without-http_upstream_dynamic_module
                                      disable ngx_http_upstream_dynamic_module
+  --without-http_upstream_hash_module
+                                     disable ngx_http_upstream_hash_module
   --without-http_upstream_ip_hash_module
                                      disable ngx_http_upstream_ip_hash_module
   --without-http_upstream_consistent_hash_module
@@ -1006,6 +1018,7 @@ if [ $NGX_SHARED_ALL_MODULES = YES ]; then
     HTTP_EMPTY_GIF_SHARED=YES
     HTTP_BROWSER_SHARED=YES
     HTTP_USER_AGENT_SHARED=YES
+    HTTP_UPSTREAM_HASH_SHARED=YES
     HTTP_UPSTREAM_IP_HASH_SHARED=YES
     HTTP_UPSTREAM_LEAST_CONN_SHARED=YES
     HTTP_UPSTREAM_SESSION_STICKY_SHARED=YES
@@ -1043,6 +1056,7 @@ if [ $NGX_SHARED_ALL_MODULES = YES ]; then
     HTTP_EMPTY_GIF=NO
     HTTP_BROWSER=NO
     HTTP_USER_AGENT=NO
+    HTTP_UPSTREAM_HASH=NO
     HTTP_UPSTREAM_IP_HASH=NO
     HTTP_UPSTREAM_LEAST_CONN=NO
     HTTP_UPSTREAM_SESSION_STICKY=NO
@@ -1093,6 +1107,7 @@ elif [ $NGX_STATIC_ALL_MODULES = YES ]; then
     HTTP_MP4=YES
     HTTP_GZIP_STATIC=YES
     HTTP_GUNZIP=YES
+    HTTP_UPSTREAM_HASH=YES
     HTTP_UPSTREAM_IP_HASH=YES
     HTTP_FOOTER=YES
     HTTP_TRIM=YES
@@ -1140,6 +1155,7 @@ elif [ $NGX_STATIC_ALL_MODULES = YES ]; then
     HTTP_EMPTY_GIF_SHARED=NO
     HTTP_BROWSER_SHARED=NO
     HTTP_USER_AGENT_SHARED=NO
+    HTTP_UPSTREAM_HASH_SHARED=NO
     HTTP_UPSTREAM_IP_HASH_SHARED=NO
     HTTP_UPSTREAM_LEAST_CONN_SHARED=NO
     HTTP_UPSTREAM_SESSION_STICKY_SHARED=NO
