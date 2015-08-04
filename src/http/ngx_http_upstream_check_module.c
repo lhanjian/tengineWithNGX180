@@ -3148,7 +3148,9 @@ ngx_http_upstream_check_status_handler(ngx_http_request_t *r)
         ctx->format = uclcf->format;
     }
 
+    r->headers_out.content_type_len = ctx->format->content_type.len;
     r->headers_out.content_type = ctx->format->content_type;
+    r->headers_out.content_type_lowcase = NULL;
 
     if (r->method == NGX_HTTP_HEAD) {
         r->headers_out.status = NGX_HTTP_OK;
@@ -4306,6 +4308,7 @@ ngx_http_upstream_check_init_shm_zone(ngx_shm_zone_t *shm_zone, void *data)
 
     opeers_shm = NULL;
     peers_shm = NULL;
+    ngx_str_set(&oshm_name, "");
 
     same = 0;
     peers = check_peers_ctx;
