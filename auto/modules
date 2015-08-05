@@ -758,8 +758,7 @@ if [ $MAIL_SSL = YES ]; then
     USE_OPENSSL=YES
 fi
 
-modules="$CORE_MODULES $EVENT_MODULES"
-
+modules="$CORE_MODULES $EVENT_MODULES $PROCS_MODULES"
 
 # thread pool module should be initialized after events
 if [ $USE_THREADS = YES ]; then
