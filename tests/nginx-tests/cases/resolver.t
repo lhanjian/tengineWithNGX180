@@ -100,7 +100,7 @@ http {
 
 EOF
 
-$t->write_file('resolv.conf', 'nameserver 8.8.8.8');
+$t->write_file('resolv.conf', 'nameserver 223.5.5.5');
 
 $t->run();
 
@@ -139,7 +139,7 @@ http {
 
 EOF
 
-$t->write_file('resolv2.conf', '   nameserver     8.8.8.8   ');
+$t->write_file('resolv2.conf', '   nameserver     223.5.5.5   ');
 
 $t->run();
 
@@ -179,7 +179,7 @@ http {
 EOF
 
 $t->write_file_expand('resolv3.conf', <<'EOF');
-nameserver 8.8.8.8
+nameserver 223.5.5.5
 nameserver 114.114.114.114
 EOF
 
@@ -222,8 +222,8 @@ EOF
 
 $t->write_file_expand('resolv4.conf', <<'EOF');
 
-  nameserver 8.8.8.8  
-  nameserver    8.8.8.8  
+  nameserver 223.5.5.5
+  nameserver 223.6.6.6
   nameserver  114.114.114.114  
 
 EOF
