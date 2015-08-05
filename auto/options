@@ -14,6 +14,7 @@ NGX_PID_PATH=
 NGX_LOCK_PATH=
 NGX_USER=
 NGX_GROUP=
+NGX_BUILD=
 
 NGX_DSO_PATH=
 NGX_DSO_TOOL_PATH=
@@ -411,6 +412,7 @@ do
 
         --crossbuild=*)                            NGX_PLATFORM="$value"      ;;
 
+        --build=*)                       NGX_BUILD="$value"         ;;
         --builddir=*)                              NGX_OBJS="$value"          ;;
 
         --enable-mods-shared=all)                  NGX_SHARED_ALL_MODULES=YES ;;
@@ -423,6 +425,7 @@ do
         --without-poll_module)                     EVENT_POLL=NONE            ;;
         --with-aio_module)                         EVENT_AIO=YES              ;;
 
+        #--with-threads)                            USE_THREADS=YES            ;;
         #--with-threads=*)                          USE_THREADS="$value"       ;;
         #--with-threads)                            USE_THREADS="pthreads"     ;;
 
@@ -745,6 +748,7 @@ cat << END
   --group=GROUP                      set non-privileged group for
                                      worker processes
 
+  --build=NAME                       set build name
   --builddir=DIR                     set build directory
 
   --enable-mods-shared=all           enable all the modules to be shared
