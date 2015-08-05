@@ -63,6 +63,7 @@ http {
             proxy_pass  http://$http_x_name:8080/backend;
         }
         location /invalid {
+            resolver    127.0.0.1:8081;
             proxy_pass  http://$host:8080/backend;
         }
         location /resend {
@@ -235,7 +236,6 @@ my $s2 = http_get('/bad', start => 1);
 
 http_end($s);
 ok(http_end($s2), 'timeout handler on 2nd request');
-
 ###############################################################################
 
 sub http_host_header {
