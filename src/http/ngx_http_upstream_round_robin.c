@@ -483,11 +483,6 @@ ngx_http_upstream_get_round_robin_peer(ngx_peer_connection_t *pc, void *data)
     pc->socklen = peer->socklen;
     pc->name = &peer->name;
     pc->host = &peer->host;
-/*
-    if (pc->tries == 1 && rrp->peers->next) {
-        pc->tries += rrp->peers->next->number;
-    }
-*/
 
     /* ngx_unlock_mutex(peers->mutex); */
 
@@ -502,7 +497,6 @@ failed:
         ngx_log_debug0(NGX_LOG_DEBUG_HTTP, pc->log, 0, "backup servers");
 
         rrp->peers = peers->next;
-//        pc->tries = rrp->peers->number;
 
         n = (rrp->peers->number + (8 * sizeof(uintptr_t) - 1))
                 / (8 * sizeof(uintptr_t));
