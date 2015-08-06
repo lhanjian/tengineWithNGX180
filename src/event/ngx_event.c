@@ -512,7 +512,7 @@ ngx_event_module_init(ngx_cycle_t *cycle)
 #endif
 
     shm.size = size;
-    shm.name.len = sizeof("nginx_shared_zone") - 1;
+    shm.name.len = sizeof("nginx_shared_zone");
     shm.name.data = (u_char *) "nginx_shared_zone";
     shm.log = cycle->log;
 
