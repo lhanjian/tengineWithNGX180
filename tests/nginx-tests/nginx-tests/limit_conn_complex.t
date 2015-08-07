@@ -93,6 +93,5 @@ select undef, undef, undef, 0.2;
  
 like(http_get('/'), qr/^HTTP\/1.. 503 /, 'limit_conn same key');
 unlike(http_get('/?c=2'), qr/^HTTP\/1.. 503 /, 'limit_conn different key');
-sleep 500000;
 
 ###############################################################################
