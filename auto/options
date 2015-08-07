@@ -81,6 +81,7 @@ NGX_ALL_MODULES="
     ngx_http_index_module
     ngx_http_random_index_module
     ngx_http_auth_basic_module
+    ngx_http_auth_request_module
     ngx_http_access_module
     ngx_http_limit_conn_module
     ngx_http_limit_req_module
@@ -222,7 +223,7 @@ HTTP_ADDITION=NO
 HTTP_DAV=NO
 HTTP_ACCESS=YES
 HTTP_AUTH_BASIC=YES
-HTTP_AUTH_REQUEST=NO
+HTTP_AUTH_REQUEST=YES
 HTTP_USERID=YES
 HTTP_CONCAT=NO
 HTTP_AUTOINDEX=YES
