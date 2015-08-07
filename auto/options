@@ -896,6 +896,7 @@ cat << END
   --without-http_reqstat_module      disable ngx_http_reqstat_module
 
   --with-http_dyups_module           enable ngx_http_dyups_module
+  --with-http_dyups_lua_api          enable ngx_http_dyups_lua_api
 
   --with-http_perl_module            enable ngx_http_perl_module
   --with-perl_modules_path=PATH      set Perl modules path
